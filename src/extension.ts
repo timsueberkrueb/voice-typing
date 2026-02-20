@@ -6,18 +6,22 @@ import { CursorInputInjector } from "./inject/cursorInputInjector";
 import { VoicePromptOrchestrator } from "./orchestration/voicePromptOrchestrator";
 import { CloudRewriteProvider } from "./rewrite/cloudRewriteProvider";
 import { OllamaRewriteProvider } from "./rewrite/ollamaRewriteProvider";
-import { LocalSttProvider } from "./stt/localSttProvider";
+import { WhisperCppSttProvider, findWhisperCppBinary } from "./stt/whisperCppSttProvider";
+import { HttpSttProvider } from "./stt/httpSttProvider";
+import { ModelManager } from "./stt/modelManager";
+import { ISttProvider } from "./types/contracts";
 
 const START_RECORDING_COMMAND = "voicePrompt.startRecording";
 
 export function activate(context: vscode.ExtensionContext): void {
   const settings = readSettings();
   const secrets = new SecretsManager(context.secrets);
+  const modelManager = new ModelManager(context.globalStorageUri);
 
   const audioCapture = new AudioCaptureService({
     vadEnabled: settings.vadEnabled,
     vadSilenceMs: settings.vadSilenceMs,
-    vadMinSpeechMs: settings.vadMinSpeechMs
+    vadMinSpeechMs: settings.vadMinSpeechMs,
   });
 
   const baseOllamaProvider =
@@ -26,7 +30,7 @@ export function activate(context: vscode.ExtensionContext): void {
       : new OllamaRewriteProvider({
           baseUrl: settings.rewriteOllamaBaseUrl,
           model: settings.rewriteModel,
-          timeoutMs: settings.rewriteTimeoutMs
+          timeoutMs: settings.rewriteTimeoutMs,
         });
 
   const cloudRewriteProviderFactory = async (): Promise<
@@ -40,28 +44,64 @@ export function activate(context: vscode.ExtensionContext): void {
       apiUrl: settings.rewriteCloudBaseUrl,
       model: settings.rewriteModel,
       apiKey: key,
-      timeoutMs: settings.rewriteTimeoutMs
+      timeoutMs: settings.rewriteTimeoutMs,
     });
   };
 
-  const orchestrator = new VoicePromptOrchestrator({
-    settings,
-    audioCapture,
-    sttProvider: new LocalSttProvider({
-      endpoint: settings.sttLocalEndpoint,
-      model: settings.sttModel,
-      timeoutMs: settings.sttTimeoutMs
-    }),
-    rewriteProvider:
-      settings.rewriteProvider === "cloud" ? undefined : baseOllamaProvider,
-    cloudRewriteProvider: undefined,
-    inputInjector: new CursorInputInjector()
-  });
+  let sttProvider: ISttProvider | undefined;
+
+  const resolveSttProvider = async (): Promise<ISttProvider> => {
+    if (sttProvider) {
+      return sttProvider;
+    }
+
+    if (settings.sttProvider === "http") {
+      sttProvider = new HttpSttProvider({
+        endpoint: settings.sttHttpEndpoint,
+        timeoutMs: settings.sttTimeoutMs,
+      });
+      return sttProvider;
+    }
+
+    const binaryPath = await findWhisperCppBinary(
+      settings.sttWhisperCppPath || undefined
+    );
+    if (!binaryPath) {
+      let installCmd: string;
+      if (process.platform === "darwin") {
+        installCmd = "brew install whisper-cpp";
+      } else if (process.platform === "linux") {
+        installCmd = "sudo apt install whisper-cpp  (or download from github.com/ggerganov/whisper.cpp/releases)";
+      } else {
+        installCmd = "Download from github.com/ggerganov/whisper.cpp/releases";
+      }
+
+      void vscode.window.showErrorMessage(
+        `whisper-cpp not found. Install it: ${installCmd}`
+      );
+      throw new Error("whisper-cpp binary not found.");
+    }
+
+    let modelPath = settings.sttModelPath;
+    if (!modelPath) {
+      modelPath = await modelManager.ensureModel(settings.sttModel);
+    }
+
+    sttProvider = new WhisperCppSttProvider({
+      binaryPath,
+      modelPath,
+      language: settings.sttLanguage,
+      timeoutMs: settings.sttTimeoutMs,
+    });
+    return sttProvider;
+  };
 
   const startRecordingDisposable = vscode.commands.registerCommand(
     START_RECORDING_COMMAND,
     async () => {
       try {
+        const currentStt = await resolveSttProvider();
+
         const cloudProvider = await cloudRewriteProviderFactory();
         const primaryRewriteProvider =
           settings.rewriteProvider === "cloud" ? cloudProvider : baseOllamaProvider;
@@ -73,10 +113,15 @@ export function activate(context: vscode.ExtensionContext): void {
             "Cloud API key missing. Run 'Voice Prompt: Set Cloud API Key'."
           );
         }
-        orchestrator.setRewriteProviders(
-          primaryRewriteProvider,
-          fallbackCloudProvider
-        );
+
+        const orchestrator = new VoicePromptOrchestrator({
+          settings,
+          audioCapture,
+          sttProvider: currentStt,
+          rewriteProvider: primaryRewriteProvider,
+          cloudRewriteProvider: fallbackCloudProvider,
+          inputInjector: new CursorInputInjector(settings.insertTrailingSpace),
+        });
 
         await orchestrator.runOnce();
       } catch (error) {
@@ -94,7 +139,7 @@ export function activate(context: vscode.ExtensionContext): void {
         title: "Voice Prompt Cloud API Key",
         prompt: "Paste API key for cloud rewrite provider",
         password: true,
-        ignoreFocusOut: true
+        ignoreFocusOut: true,
       });
       if (!apiKey) {
         return;
@@ -112,7 +157,7 @@ export function activate(context: vscode.ExtensionContext): void {
     );
     item.name = "Voice Prompt";
     item.text = "$(mic) Voice Prompt";
-    item.tooltip = "Start voice prompt recording (Cmd+Shift+V)";
+    item.tooltip = "Start voice prompt recording (Option+V)";
     item.command = START_RECORDING_COMMAND;
     item.show();
     context.subscriptions.push(item);

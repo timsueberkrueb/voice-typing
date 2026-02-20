@@ -1,8 +1,8 @@
 export interface AudioChunk {
+  wavPath: string;
   pcm16: Buffer;
   sampleRateHz: number;
   channels: number;
-  startedAtIso: string;
 }
 
 export interface RawTranscript {

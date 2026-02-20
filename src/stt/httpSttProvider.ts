@@ -1,14 +1,13 @@
 import { AudioChunk, ISttProvider, RawTranscript } from "../types/contracts";
 import { request } from "undici";
 
-interface LocalSttProviderOptions {
+interface HttpSttProviderOptions {
   endpoint: string;
-  model: string;
   timeoutMs: number;
 }
 
-export class LocalSttProvider implements ISttProvider {
-  constructor(private readonly options: LocalSttProviderOptions) {}
+export class HttpSttProvider implements ISttProvider {
+  constructor(private readonly options: HttpSttProviderOptions) {}
 
   async transcribe(audio: AudioChunk): Promise<RawTranscript> {
     if (audio.pcm16.length === 0) {
@@ -16,7 +15,6 @@ export class LocalSttProvider implements ISttProvider {
     }
 
     const body = {
-      model: this.options.model,
       audioBase64: audio.pcm16.toString("base64"),
       sampleRateHz: audio.sampleRateHz,
       channels: audio.channels
@@ -33,7 +31,7 @@ export class LocalSttProvider implements ISttProvider {
     });
 
     if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw new Error(`Local STT failed (${res.statusCode})`);
+      throw new Error(`HTTP STT failed (${res.statusCode})`);
     }
 
     const payload = (await res.body.json()) as { text?: string; confidence?: number };

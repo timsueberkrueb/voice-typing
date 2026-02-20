@@ -8,6 +8,7 @@ esbuild.mjs
 .git-template/**
 PLAN.md
 CLAUDE.md
+.cursor/**
 **/*.ts
-!dist/**
 node_modules/**
+*.vsix

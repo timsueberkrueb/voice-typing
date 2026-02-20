@@ -7,7 +7,7 @@ import {
   ISttProvider,
   RewriteInput
 } from "../types/contracts";
-import { AudioCaptureService } from "../audio/audioCaptureService";
+import { AudioCaptureService, cleanupWavFile } from "../audio/audioCaptureService";
 
 interface Dependencies {
   settings: VoicePromptSettings;
@@ -33,50 +33,82 @@ export class VoicePromptOrchestrator {
   }
 
   async runOnce(): Promise<void> {
-    void vscode.window.setStatusBarMessage("$(mic) Listening...", 60_000);
-
-    const audio = await this.deps.audioCapture.captureOnce();
-    this.lastCapturedAudio = audio;
-
-    if (audio.pcm16.length === 0) {
-      void vscode.window.showWarningMessage(
-        "No audio captured. Check your microphone and SoX installation."
-      );
-      return;
-    }
-
-    void vscode.window.setStatusBarMessage("$(sync~spin) Transcribing...", 30_000);
-
-    const raw = await this.transcribeWithRetry(audio);
-    const sourceText = raw.text.trim();
-
-    if (!sourceText) {
-      void vscode.window.showWarningMessage(
-        "No speech detected. Try speaking more clearly."
-      );
-      return;
-    }
-
-    void vscode.window.setStatusBarMessage("$(edit) Rewriting...", 30_000);
-
-    const finalText = await this.resolveFinalText(sourceText);
-    if (!finalText) {
-      return;
-    }
-
-    const maybeEdited = await this.previewIfEnabled(finalText);
-    if (maybeEdited === undefined) {
-      return;
-    }
+    let statusDisposable: vscode.Disposable | undefined;
+    const setStatus = (msg: string) => {
+      statusDisposable?.dispose();
+      statusDisposable = vscode.window.setStatusBarMessage(msg);
+    };
+    const clearStatus = () => {
+      statusDisposable?.dispose();
+      statusDisposable = undefined;
+    };
 
     try {
-      await this.deps.inputInjector.insert(maybeEdited);
-      void vscode.window.setStatusBarMessage("$(check) Voice Prompt inserted", 2000);
-    } catch {
-      await vscode.env.clipboard.writeText(maybeEdited);
-      void vscode.window.showErrorMessage(
-        "Insertion failed. Copied rewritten prompt to clipboard — paste with Cmd+V."
-      );
+      setStatus("$(mic) Listening...");
+
+      const t0 = Date.now();
+      const audio = await this.deps.audioCapture.captureOnce();
+      this.lastCapturedAudio = audio;
+      const recordMs = Date.now() - t0;
+
+      if (audio.pcm16.length === 0) {
+        clearStatus();
+        void cleanupWavFile(audio.wavPath);
+        void vscode.window.showWarningMessage(
+          "No audio captured. Check your microphone permissions."
+        );
+        return;
+      }
+
+      setStatus("$(sync~spin) Transcribing...");
+
+      const t1 = Date.now();
+      const raw = await this.transcribeWithRetry(audio);
+      const sttMs = Date.now() - t1;
+      void cleanupWavFile(audio.wavPath);
+      const sourceText = raw.text.trim();
+
+      if (!sourceText) {
+        clearStatus();
+        void vscode.window.showWarningMessage(
+          "No speech detected. Try speaking more clearly."
+        );
+        return;
+      }
+
+      setStatus("$(sync~spin) Rewriting...");
+
+      const t2 = Date.now();
+      const finalText = await this.resolveFinalText(sourceText);
+      const rewriteMs = Date.now() - t2;
+      if (!finalText) {
+        clearStatus();
+        return;
+      }
+
+      const maybeEdited = await this.previewIfEnabled(finalText);
+      if (maybeEdited === undefined) {
+        clearStatus();
+        return;
+      }
+
+      try {
+        await this.deps.inputInjector.insert(maybeEdited);
+        clearStatus();
+        const totalMs = Date.now() - t0;
+        void vscode.window.setStatusBarMessage(
+          `$(check) Done (rec ${(recordMs / 1000).toFixed(1)}s + stt ${(sttMs / 1000).toFixed(1)}s + rewrite ${(rewriteMs / 1000).toFixed(1)}s = ${(totalMs / 1000).toFixed(1)}s)`,
+          5000
+        );
+      } catch {
+        clearStatus();
+        await vscode.env.clipboard.writeText(maybeEdited);
+        void vscode.window.showErrorMessage(
+          "Insertion failed. Copied rewritten prompt to clipboard — paste with Cmd+V."
+        );
+      }
+    } finally {
+      clearStatus();
     }
   }
 
