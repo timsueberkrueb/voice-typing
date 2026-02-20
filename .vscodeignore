@@ -14,3 +14,11 @@ node_modules/**
 *.vsix
 icon.svg
 publisher-icon*
+**/*.js.map
+dist/audio/**
+dist/config/**
+dist/inject/**
+dist/orchestration/**
+dist/rewrite/**
+dist/stt/**
+dist/types/**

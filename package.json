@@ -16,9 +16,24 @@
   "engines": {
     "vscode": "^1.90.0"
   },
-  "categories": [
-    "Other"
+  "keywords": [
+    "voice",
+    "speech",
+    "dictation",
+    "whisper",
+    "microphone",
+    "accessibility",
+    "transcription",
+    "stt"
   ],
+  "categories": [
+    "Other",
+    "Machine Learning"
+  ],
+  "galleryBanner": {
+    "color": "#1a1a2e",
+    "theme": "dark"
+  },
   "icon": "icon.png",
   "main": "./dist/extension.js",
   "activationEvents": [
