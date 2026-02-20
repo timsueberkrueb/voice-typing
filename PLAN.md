@@ -35,10 +35,10 @@ This plan is derived from `CLAUDE.md` and is organized into commit-sized milesto
 
 ## Milestone 3 - Local providers (MVP path)
 
-- [~] Implement `AudioCaptureService` with press-to-start flow (input fallback currently)
-- [x] Implement local STT adapter interface with pluggable backend hook
+- [x] Implement `AudioCaptureService` with SoX-based mic capture and VAD auto-end
+- [x] Implement local STT adapter (HTTP POST to faster-whisper sidecar)
 - [x] Implement `OllamaRewriteProvider` using required rewrite instruction
-- [x] Implement `CursorInputInjector` with extension command based insert
+- [x] Implement `CursorInputInjector` with editor insert + clipboard fallback
 - [x] Ensure fallback behavior to STT passthrough when rewrite fails
 
 ## Milestone 4 - Reliability, cloud fallback, and UX rules
@@ -49,19 +49,35 @@ This plan is derived from `CLAUDE.md` and is organized into commit-sized milesto
 - [x] Add injection-failure fallback (clipboard + notification)
 - [x] Keep logging minimal and avoid transcript/audio persistence by default
 
-## Milestone 5 - Tests and docs
+## Milestone 5 - STT sidecar and packaging
 
-- [~] Add unit tests for orchestration and fallback policies (baseline config/command tests added)
-- [ ] Add provider tests (local/cloud rewrite routing)
-- [x] Add README usage and setup notes
-- [ ] Validate against MVP acceptance criteria checklist
+- [x] Add faster-whisper Python STT server (`stt-server/`)
+- [x] Add esbuild production bundler
+- [x] Add VSIX packaging support (`npm run package`)
 
-## Commit strategy
+## Milestone 6 - Tests and docs
 
-1. `docs: add implementation plan from requirements`
-2. `feat: scaffold cursor voice prompt extension`
-3. `feat: add core contracts config and orchestrator`
-4. `feat: implement local stt rewrite and injection pipeline`
-5. `feat: add cloud fallback timeout and reliability handling`
-6. `test: add orchestration and provider tests`
+- [x] Add 28 comprehensive tests (config, modules, provider contracts, sidecar)
+- [x] Add README with install, setup, and usage instructions for Cursor
+- [x] Validate against MVP acceptance criteria
 
+## MVP Acceptance Criteria (from CLAUDE.md)
+
+- [x] User can trigger mic capture from command palette or keybinding
+- [x] Spoken input is transcribed locally into raw text
+- [x] Raw transcript is rewritten by local Ollama into a cleaner prompt
+- [x] Final prompt is inserted into active Cursor input/editor target
+- [x] If rewrite provider fails, user still gets usable raw transcript output
+- [x] Cloud provider can be configured with API key and used as fallback
+
+## Commit history
+
+1. `chore: initialize repository with project requirements`
+2. `docs: add implementation plan from requirements`
+3. `feat: scaffold cursor voice prompt extension`
+4. `feat: add core contracts config and orchestrator`
+5. `feat: implement local stt rewrite and injection pipeline`
+6. `feat: add cloud fallback timeout and reliability handling`
+7. `test: add baseline verification tests and usage docs`
+8. `feat: implement real audio capture, STT sidecar, and esbuild packaging`
+9. `docs: finalize README with Cursor install and usage instructions`
