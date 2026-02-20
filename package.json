@@ -2,7 +2,7 @@
   "name": "voice-prompt",
   "displayName": "Voice Typing",
   "description": "Capture voice, rewrite into clean prompts, and inject into VS Code / Cursor input.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "qingy-wu",
   "repository": {
     "type": "git",
