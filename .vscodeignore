@@ -12,3 +12,5 @@ CLAUDE.md
 **/*.ts
 node_modules/**
 *.vsix
+icon.svg
+publisher-icon*

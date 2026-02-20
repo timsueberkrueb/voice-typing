@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a1a2e"/>
+      <stop offset="100%" stop-color="#16213e"/>
+    </linearGradient>
+    <linearGradient id="mic" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#00d2ff"/>
+      <stop offset="100%" stop-color="#7b2ff7"/>
+    </linearGradient>
+    <linearGradient id="wave" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00d2ff" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#7b2ff7" stop-opacity="0.8"/>
+    </linearGradient>
+    <linearGradient id="code" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00d2ff" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#7b2ff7" stop-opacity="0.6"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background rounded square -->
+  <rect width="128" height="128" rx="24" ry="24" fill="url(#bg)"/>
+
+  <!-- Microphone body -->
+  <rect x="50" y="24" width="28" height="44" rx="14" ry="14" fill="url(#mic)"/>
+
+  <!-- Microphone grille lines -->
+  <line x1="54" y1="36" x2="74" y2="36" stroke="#1a1a2e" stroke-width="1.5" stroke-opacity="0.3"/>
+  <line x1="54" y1="42" x2="74" y2="42" stroke="#1a1a2e" stroke-width="1.5" stroke-opacity="0.3"/>
+  <line x1="54" y1="48" x2="74" y2="48" stroke="#1a1a2e" stroke-width="1.5" stroke-opacity="0.3"/>
+  <line x1="54" y1="54" x2="74" y2="54" stroke="#1a1a2e" stroke-width="1.5" stroke-opacity="0.3"/>
+
+  <!-- Microphone arc (pickup area) -->
+  <path d="M 38 56 Q 38 80 64 80 Q 90 80 90 56" fill="none" stroke="url(#mic)" stroke-width="3.5" stroke-linecap="round"/>
+
+  <!-- Microphone stand -->
+  <line x1="64" y1="80" x2="64" y2="92" stroke="url(#mic)" stroke-width="3.5" stroke-linecap="round"/>
+  <line x1="52" y1="92" x2="76" y2="92" stroke="url(#mic)" stroke-width="3.5" stroke-linecap="round"/>
+
+  <!-- Sound waves (left) -->
+  <path d="M 30 40 Q 22 52 30 64" fill="none" stroke="url(#wave)" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M 22 34 Q 10 52 22 70" fill="none" stroke="url(#wave)" stroke-width="2" stroke-linecap="round" stroke-opacity="0.5"/>
+
+  <!-- Sound waves (right) -->
+  <path d="M 98 40 Q 106 52 98 64" fill="none" stroke="url(#wave)" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M 106 34 Q 118 52 106 70" fill="none" stroke="url(#wave)" stroke-width="2" stroke-linecap="round" stroke-opacity="0.5"/>
+
+  <!-- Code brackets at bottom -->
+  <text x="24" y="112" font-family="monospace" font-size="18" font-weight="bold" fill="url(#code)">&lt;/&gt;</text>
+  <text x="82" y="112" font-family="monospace" font-size="18" font-weight="bold" fill="url(#code)">{;}</text>
+</svg>

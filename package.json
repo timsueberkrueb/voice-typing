@@ -4,12 +4,22 @@
   "description": "Capture voice, rewrite into clean prompts, and inject into VS Code / Cursor input.",
   "version": "0.2.0",
   "publisher": "qingy-wu",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bread22/voice-typing.git"
+  },
+  "homepage": "https://github.com/bread22/voice-typing#readme",
+  "bugs": {
+    "url": "https://github.com/bread22/voice-typing/issues"
+  },
+  "license": "MIT",
   "engines": {
     "vscode": "^1.90.0"
   },
   "categories": [
     "Other"
   ],
+  "icon": "icon.png",
   "main": "./dist/extension.js",
   "activationEvents": [
     "onCommand:voicePrompt.startRecording",
