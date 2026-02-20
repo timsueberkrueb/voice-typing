@@ -1,0 +1,113 @@
+{
+  "name": "voice-prompt",
+  "displayName": "Voice Prompt",
+  "description": "Capture voice, rewrite into clean prompts, and inject into Cursor input.",
+  "version": "0.0.1",
+  "publisher": "bread22",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onCommand:voicePrompt.startRecording"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "voicePrompt.startRecording",
+        "title": "Voice Prompt: Start Recording"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "voicePrompt.startRecording",
+        "key": "cmd+shift+v",
+        "when": "editorTextFocus || focusedView == workbench.panel.chat.view.copilot"
+      }
+    ],
+    "configuration": {
+      "title": "Voice Prompt",
+      "properties": {
+        "voicePrompt.stt.provider": {
+          "type": "string",
+          "default": "local",
+          "enum": ["local", "cloud"],
+          "description": "Speech-to-text provider."
+        },
+        "voicePrompt.stt.model": {
+          "type": "string",
+          "default": "faster-whisper-base",
+          "description": "STT model identifier."
+        },
+        "voicePrompt.rewrite.provider": {
+          "type": "string",
+          "default": "ollama",
+          "enum": ["ollama", "cloud", "none"],
+          "description": "Rewrite provider."
+        },
+        "voicePrompt.rewrite.model": {
+          "type": "string",
+          "default": "llama3.1:8b",
+          "description": "Rewrite model identifier."
+        },
+        "voicePrompt.previewBeforeInsert": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show editable preview before insertion."
+        },
+        "voicePrompt.autoFallbackToCloud": {
+          "type": "boolean",
+          "default": false,
+          "description": "Fallback to cloud provider if local rewrite fails."
+        },
+        "voicePrompt.noRewriteBehavior": {
+          "type": "string",
+          "default": "stt_passthrough",
+          "enum": ["stt_passthrough", "disable_plugin"],
+          "description": "Behavior when no rewrite backend is available."
+        },
+        "voicePrompt.showStatusBarButton": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show status bar microphone button."
+        },
+        "voicePrompt.vad.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable VAD auto-end behavior."
+        },
+        "voicePrompt.vad.silenceMs": {
+          "type": "number",
+          "default": 900,
+          "minimum": 600,
+          "maximum": 1500,
+          "description": "Silence duration to auto-stop recording."
+        },
+        "voicePrompt.vad.minSpeechMs": {
+          "type": "number",
+          "default": 300,
+          "minimum": 100,
+          "maximum": 1000,
+          "description": "Minimum speech duration to accept input."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc -p .",
+    "watch": "tsc -w -p .",
+    "test": "npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "@types/vscode": "^1.90.0",
+    "typescript": "^5.8.2"
+  },
+  "dependencies": {
+    "undici": "^7.5.0"
+  }
+}
+
