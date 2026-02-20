@@ -1,10 +1,20 @@
-# Voice Prompt — VS Code / Cursor Extension
+# Voice Typing — VS Code / Cursor Extension
+
+[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/qingy-wu.voice-prompt?label=Marketplace&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=qingy-wu.voice-prompt)
+[![GitHub Release](https://img.shields.io/github/v/release/bread22/voice-typing)](https://github.com/bread22/voice-typing/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Speak into your microphone, get a clean coding prompt inserted into your editor. Everything runs locally — no cloud services required.
 
 **Flow:** Mic → whisper.cpp (local STT) → Ollama (local LLM rewrite) → Insert into editor
 
 **Platforms:** macOS · Linux · Windows — works in both **VS Code** and **Cursor**
+
+## Install
+
+**From Marketplace:** [Voice Typing on VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=qingy-wu.voice-prompt)
+
+**Or from VSIX:** Download the latest `.vsix` from [GitHub Releases](https://github.com/bread22/voice-typing/releases), then in VS Code/Cursor: `Cmd+Shift+P` → "Install from VSIX"
 
 ---
 
@@ -14,13 +24,14 @@ Speak into your microphone, get a clean coding prompt inserted into your editor.
 brew install whisper-cpp sox       # STT engine + audio recorder
 brew install ollama                # optional: LLM rewrite
 ollama pull llama3.2:3b            # optional: pull rewrite model
+```
 
-# Install the extension
+Install the extension from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=qingy-wu.voice-prompt), or build from source:
+
+```bash
 git clone https://github.com/bread22/voice-typing.git
-cd voice-typing
-npm install
-npm run package
-# In VS Code/Cursor: Cmd+Shift+P → "Install from VSIX" → select voice-prompt-*.vsix
+cd voice-typing && npm install && npm run package
+# Then: Cmd+Shift+P → "Install from VSIX" → select voice-prompt-*.vsix
 ```
 
 Press **Option+V** to start recording. The whisper model (~75 MB) downloads automatically on first use.
