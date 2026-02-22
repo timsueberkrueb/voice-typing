@@ -31,7 +31,7 @@ export class AudioCaptureService {
   private detectedRecorder?: RecorderInfo;
   private detectionDone = false;
 
-  constructor(private readonly options: CaptureOptions) {}
+  constructor(private readonly options: CaptureOptions) { }
 
   setStatusBarItem(item: vscode.StatusBarItem): void {
     this.statusBarItem = item;
@@ -89,6 +89,11 @@ export class AudioCaptureService {
       const proc = spawn(recorder.binaryPath, args, {
         stdio: usesStdout ? ["ignore", "pipe", "pipe"] : ["ignore", "ignore", "pipe"]
       });
+      let stopRequested = false;
+      const stopRecording = (): void => {
+        stopRequested = true;
+        killProc(proc);
+      };
 
       const chunks: Buffer[] = [];
       let stderrData = "";
@@ -105,12 +110,12 @@ export class AudioCaptureService {
         stderrData += chunk.toString();
       });
 
-      proc.on("close", async (code) => {
+      proc.on("close", async (code, signal) => {
         if (usesStdout && chunks.length > 0) {
           const { writeFile } = await import("node:fs/promises");
           await writeFile(wavPath, Buffer.concat(chunks));
         }
-        if (code !== 0 && code !== null) {
+        if (!isExpectedExit(recorder.backend, stopRequested, code, signal)) {
           const msg = stderrData.slice(0, 300).trim();
           reject(new Error(`Recording exited with code ${code}: ${msg}`));
           return;
@@ -119,14 +124,18 @@ export class AudioCaptureService {
       });
 
       if (this.options.vadEnabled) {
-        this.runVadAutoStop(proc, recorder, wavPath);
+        this.runVadAutoStop(proc, wavPath, stopRecording);
       } else {
-        this.runTimedStop(proc, 30_000);
+        this.runTimedStop(30_000, stopRecording);
       }
     });
   }
 
-  private runVadAutoStop(proc: ChildProcess, recorder: RecorderInfo, wavPath: string): void {
+  private runVadAutoStop(
+    proc: ChildProcess,
+    wavPath: string,
+    stopRecording: () => void
+  ): void {
     const { vadSilenceMs, vadMinSpeechMs } = this.options;
     const SAMPLE_RATE = 16000;
     const BYTES_PER_SAMPLE = 2;
@@ -168,7 +177,7 @@ export class AudioCaptureService {
           }
         }
         if (totalBytes > msToBytes(10000)) {
-          killProc(proc);
+          stopRecording();
           clearInterval(timer);
         }
         return;
@@ -185,25 +194,48 @@ export class AudioCaptureService {
 
       const tail = getRecentSamples(pcmData, silenceWindowBytes);
       if (rmsAmplitude(tail) < SILENCE_THRESHOLD) {
-        killProc(proc);
+        stopRecording();
         clearInterval(timer);
       }
     }, CHECK_INTERVAL_MS);
 
     setTimeout(() => {
       clearInterval(timer);
-      killProc(proc);
+      stopRecording();
     }, 60_000);
   }
 
-  private runTimedStop(proc: ChildProcess, durationMs: number): void {
-    setTimeout(() => killProc(proc), durationMs);
+  private runTimedStop(durationMs: number, stopRecording: () => void): void {
+    setTimeout(() => stopRecording(), durationMs);
   }
 }
 
 function killProc(proc: ChildProcess): void {
   if (!proc.killed) {
     proc.kill("SIGTERM");
+  }
+}
+
+function isExpectedExit(
+  backend: RecorderBackend,
+  stopRequested: boolean,
+  code: number | null,
+  signal: NodeJS.Signals | null
+): boolean {
+  if (code === 0 || code === null) {
+    return true;
+  }
+  if (!stopRequested) {
+    return false;
+  }
+
+  switch (backend) {
+    case "arecord":
+      return signal === "SIGINT" || signal === "SIGTERM" || code === 1;
+    case "ffmpeg":
+      return signal === "SIGINT" || signal === "SIGTERM" || code === 255;
+    case "sox":
+      return signal === "SIGINT" || signal === "SIGTERM";
   }
 }
 
