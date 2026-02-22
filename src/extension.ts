@@ -9,12 +9,16 @@ import { WhisperCppSttProvider, findWhisperCppBinary } from "./stt/whisperCppStt
 import { HttpSttProvider } from "./stt/httpSttProvider";
 import { ModelManager } from "./stt/modelManager";
 import { ISttProvider } from "./types/contracts";
+import { OpenWakeWordService } from "./wakeword/openWakeWordService";
 
 const START_RECORDING_COMMAND = "voicePrompt.startRecording";
 
 export function activate(context: vscode.ExtensionContext): void {
   const settings = readSettings();
   const modelManager = new ModelManager(context.globalStorageUri);
+  let isRunInProgress = false;
+  const wakeOutput = vscode.window.createOutputChannel("Voice Prompt Wake Word");
+  context.subscriptions.push(wakeOutput);
 
   const audioCapture = new AudioCaptureService({
     vadEnabled: settings.vadEnabled,
@@ -93,39 +97,90 @@ export function activate(context: vscode.ExtensionContext): void {
     return sttProvider;
   };
 
+  const runVoicePrompt = async (source: "manual" | "wake-word"): Promise<void> => {
+    if (isRunInProgress) {
+      if (source === "wake-word") {
+        wakeOutput.appendLine("[info] Wake event ignored because a run is already in progress.");
+      }
+      return;
+    }
+
+    isRunInProgress = true;
+    try {
+      if (source === "wake-word") {
+        wakeOutput.appendLine("[info] Wake-triggered run starting.");
+      }
+      const currentStt = await resolveSttProvider();
+
+      const cloudCommandLayer =
+        settings.commandProvider === "chatgpt"
+          ? await cloudCommandLayerFactory()
+          : undefined;
+
+      if (
+        source === "manual" &&
+        settings.commandProvider === "chatgpt" &&
+        !cloudCommandLayer
+      ) {
+        void vscode.window.showWarningMessage(
+          "ChatGPT auth missing. Ensure ~/.codex/auth.json exists and has tokens.access_token."
+        );
+      }
+
+      const orchestrator = new VoicePromptOrchestrator({
+        settings,
+        audioCapture,
+        sttProvider: currentStt,
+        cloudCommandLayer,
+        inputInjector: new CursorInputInjector(settings.insertTrailingSpace),
+      });
+
+      await orchestrator.runOnce();
+      if (source === "wake-word") {
+        wakeOutput.appendLine("[info] Wake-triggered run completed.");
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (source === "wake-word") {
+        wakeOutput.appendLine(`[warn] Wake-triggered run failed: ${message}`);
+      }
+      void vscode.window.showErrorMessage(`Voice Prompt failed: ${message}`);
+    } finally {
+      isRunInProgress = false;
+    }
+  };
+
   const startRecordingDisposable = vscode.commands.registerCommand(
     START_RECORDING_COMMAND,
-    async () => {
-      try {
-        const currentStt = await resolveSttProvider();
-
-        const cloudCommandLayer =
-          settings.commandProvider === "chatgpt"
-            ? await cloudCommandLayerFactory()
-            : undefined;
-
-        if (settings.commandProvider === "chatgpt" && !cloudCommandLayer) {
-          void vscode.window.showWarningMessage(
-            "ChatGPT auth missing. Ensure ~/.codex/auth.json exists and has tokens.access_token."
-          );
-        }
-
-        const orchestrator = new VoicePromptOrchestrator({
-          settings,
-          audioCapture,
-          sttProvider: currentStt,
-          cloudCommandLayer,
-          inputInjector: new CursorInputInjector(settings.insertTrailingSpace),
-        });
-
-        await orchestrator.runOnce();
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        void vscode.window.showErrorMessage(`Voice Prompt failed: ${message}`);
-      }
-    }
+    async () => runVoicePrompt("manual")
   );
   context.subscriptions.push(startRecordingDisposable);
+
+  if (settings.wakeWordEnabled) {
+    const wakeLogger = {
+      info: (message: string) => wakeOutput.appendLine(`[info] ${message}`),
+      warn: (message: string) => wakeOutput.appendLine(`[warn] ${message}`),
+    };
+
+    const wakeWordService = new OpenWakeWordService(
+      {
+        pythonPath: settings.wakeWordPythonPath,
+        model: settings.wakeWordModel,
+        threshold: settings.wakeWordThreshold,
+        cooldownMs: settings.wakeWordCooldownMs,
+      },
+      () => {
+        wakeOutput.appendLine("Wake event received; starting voice prompt run.");
+        void runVoicePrompt("wake-word");
+      },
+      wakeLogger
+    );
+    wakeOutput.appendLine("[info] Wake word service enabled by settings.");
+    wakeWordService.start();
+    context.subscriptions.push(wakeWordService);
+  } else {
+    wakeOutput.appendLine("[info] Wake word service disabled by settings.");
+  }
 
   if (settings.showStatusBarButton) {
     const item = vscode.window.createStatusBarItem(

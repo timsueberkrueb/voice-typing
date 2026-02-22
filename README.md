@@ -6,7 +6,7 @@
 
 Speak into your microphone, get a clean coding prompt inserted into your editor. Everything runs locally — no cloud services required.
 
-**Flow:** Mic → whisper.cpp (local STT) → Ollama (local LLM rewrite) → Insert into editor
+**Flow:** Wake word (`openWakeWord`, default-on) or hotkey → whisper.cpp (local STT) → Ollama (local LLM rewrite) → Insert into editor
 
 **Platforms:** macOS · Linux · Windows — works in both **VS Code** and **Cursor**
 
@@ -24,6 +24,10 @@ Speak into your microphone, get a clean coding prompt inserted into your editor.
 brew install whisper-cpp sox       # STT engine + audio recorder
 brew install ollama                # optional: LLM rewrite
 ollama pull llama3.2:3b            # optional: pull rewrite model
+# Wake-word deps (safe on Debian/Ubuntu with PEP 668):
+python3 -m venv ~/.venvs/voice-typing-oww
+~/.venvs/voice-typing-oww/bin/pip install --upgrade pip
+~/.venvs/voice-typing-oww/bin/pip install openwakeword sounddevice
 ```
 
 Install the extension from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=qingy-wu.voice-prompt), or build from source:
@@ -128,6 +132,30 @@ The extension auto-detects the best available recorder for your platform:
 | Windows  | FFmpeg → SoX              |
 
 If no recorder is found, the extension shows the appropriate install command.
+
+### Step 2.5: Install wake-word dependencies (default-on)
+
+If `pip install openwakeword` fails with `externally-managed-environment` (PEP 668), use a virtual environment:
+
+```bash
+python3 -m venv ~/.venvs/voice-typing-oww
+~/.venvs/voice-typing-oww/bin/pip install --upgrade pip
+~/.venvs/voice-typing-oww/bin/pip install openwakeword sounddevice
+```
+
+Then set:
+
+```json
+{
+  "voicePrompt.wakeWord.pythonPath": "/home/<you>/.venvs/voice-typing-oww/bin/python"
+}
+```
+
+Linux users may also need:
+
+```bash
+sudo apt install libportaudio2 portaudio19-dev
+```
 
 ### Step 3: Install Ollama (optional — LLM rewrite)
 
@@ -286,6 +314,16 @@ Open settings (`Ctrl+,`) and search for `voicePrompt`.
 - **Feels slow to respond?** Decrease `silenceMs` by 100 ms
 - **Ambient noise triggering?** Increase `minSpeechMs` to 400–500 ms
 
+### Wake Word (openWakeWord)
+
+| Setting                             | Default       | Description                                                          |
+| ----------------------------------- | ------------- | -------------------------------------------------------------------- |
+| `voicePrompt.wakeWord.enabled`      | `true`        | Enable background wake-word detection.                               |
+| `voicePrompt.wakeWord.model`        | `alexa`  | openWakeWord model name.                                             |
+| `voicePrompt.wakeWord.threshold`    | `0.5`         | Detection score threshold; raise to reduce false positives.          |
+| `voicePrompt.wakeWord.cooldownMs`   | `4000`        | Minimum interval between wake triggers.                              |
+| `voicePrompt.wakeWord.pythonPath`   | `python3`     | Python executable used to launch the listener process.               |
+
 ---
 
 ## Cloud Rewrite (Optional)
@@ -303,6 +341,8 @@ Use OpenAI or another cloud LLM instead of (or as fallback to) local Ollama:
 | Problem                                  | Solution                                                                 |
 | ---------------------------------------- | ------------------------------------------------------------------------ |
 | **"whisper-cpp not found"**              | Install whisper-cpp (see platform instructions above)                    |
+| **"Wake word disabled: Missing dependency"** | Install deps in a venv and set `voicePrompt.wakeWord.pythonPath` (see Step 2.5) |
+| **"`externally-managed-environment` when installing wake-word deps** | Use a venv: `python3 -m venv ~/.venvs/voice-typing-oww` then install with that venv's `pip` |
 | **"No audio recorder found"**            | Install SoX, arecord, or FFmpeg (see Step 2 above)                      |
 | **"Transcription failed"**               | Check that `whisper-cli` works: `whisper-cli -m <model> -f test.wav`    |
 | **Model download fails**                 | Set `voicePrompt.stt.modelPath` to a manually downloaded `.bin` file     |
@@ -337,6 +377,8 @@ src/
     whisperCppSttProvider — shells out to whisper-cli binary
     httpSttProvider        — HTTP STT for custom servers (opt-in)
     modelManager           — auto-downloads GGML models from HuggingFace
+  wakeword/
+    openWakeWordService    — background wake-word listener process (openWakeWord)
   rewrite/
     ollamaRewriteProvider  — local Ollama LLM rewrite
     cloudRewriteProvider   — cloud LLM rewrite (OpenAI-compatible)

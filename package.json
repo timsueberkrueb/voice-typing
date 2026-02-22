@@ -37,7 +37,8 @@
   "icon": "icon.png",
   "main": "./dist/extension.js",
   "activationEvents": [
-    "onCommand:voicePrompt.startRecording"
+    "onCommand:voicePrompt.startRecording",
+    "onStartupFinished"
   ],
   "contributes": {
     "commands": [
@@ -167,6 +168,35 @@
           "minimum": 100,
           "maximum": 1000,
           "description": "Minimum speech duration to accept input."
+        },
+        "voicePrompt.wakeWord.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable always-on wake-word detection via openWakeWord."
+        },
+        "voicePrompt.wakeWord.model": {
+          "type": "string",
+          "default": "alexa",
+          "description": "openWakeWord model name (for example: hey_jarvis, alexa, hey_mycroft, hey_rhasspy)."
+        },
+        "voicePrompt.wakeWord.threshold": {
+          "type": "number",
+          "default": 0.5,
+          "minimum": 0.1,
+          "maximum": 0.99,
+          "description": "Detection threshold for the wake-word score."
+        },
+        "voicePrompt.wakeWord.cooldownMs": {
+          "type": "number",
+          "default": 4000,
+          "minimum": 1000,
+          "maximum": 15000,
+          "description": "Minimum gap between wake triggers in milliseconds."
+        },
+        "voicePrompt.wakeWord.pythonPath": {
+          "type": "string",
+          "default": "python3",
+          "description": "Python executable used to run openWakeWord (for example: python3, python, /usr/bin/python3)."
         }
       }
     }

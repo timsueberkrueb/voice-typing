@@ -21,6 +21,11 @@ export interface VoicePromptSettings {
   vadEnabled: boolean;
   vadSilenceMs: number;
   vadMinSpeechMs: number;
+  wakeWordEnabled: boolean;
+  wakeWordModel: string;
+  wakeWordThreshold: number;
+  wakeWordCooldownMs: number;
+  wakeWordPythonPath: string;
 }
 
 const SECTION = "voicePrompt";
@@ -51,5 +56,10 @@ export function readSettings(): VoicePromptSettings {
     vadEnabled: cfg.get<boolean>("vad.enabled", true),
     vadSilenceMs: cfg.get<number>("vad.silenceMs", 1500),
     vadMinSpeechMs: cfg.get<number>("vad.minSpeechMs", 300),
+    wakeWordEnabled: cfg.get<boolean>("wakeWord.enabled", true),
+    wakeWordModel: cfg.get<string>("wakeWord.model", "alexa"),
+    wakeWordThreshold: cfg.get<number>("wakeWord.threshold", 0.5),
+    wakeWordCooldownMs: cfg.get<number>("wakeWord.cooldownMs", 4000),
+    wakeWordPythonPath: cfg.get<string>("wakeWord.pythonPath", "python3"),
   };
 }

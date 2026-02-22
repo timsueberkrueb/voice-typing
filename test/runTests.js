@@ -99,6 +99,11 @@ function run() {
     assert.ok(kb.some((k) => k.command === "voicePrompt.startRecording"));
   });
 
+  test("activates on startup for wake-word listener", () => {
+    const events = pkg.activationEvents ?? [];
+    assert.ok(events.includes("onStartupFinished"));
+  });
+
   test("vad.enabled defaults to true", () => {
     assert.equal(props["voicePrompt.vad.enabled"]?.default, true);
   });
@@ -109,6 +114,26 @@ function run() {
 
   test("vad.minSpeechMs defaults to 300", () => {
     assert.equal(props["voicePrompt.vad.minSpeechMs"]?.default, 300);
+  });
+
+  test("wakeWord.enabled defaults to true", () => {
+    assert.equal(props["voicePrompt.wakeWord.enabled"]?.default, true);
+  });
+
+  test("wakeWord.model defaults to alexa", () => {
+    assert.equal(props["voicePrompt.wakeWord.model"]?.default, "alexa");
+  });
+
+  test("wakeWord.threshold defaults to 0.5", () => {
+    assert.equal(props["voicePrompt.wakeWord.threshold"]?.default, 0.5);
+  });
+
+  test("wakeWord.cooldownMs defaults to 4000", () => {
+    assert.equal(props["voicePrompt.wakeWord.cooldownMs"]?.default, 4000);
+  });
+
+  test("wakeWord.pythonPath defaults to python3", () => {
+    assert.equal(props["voicePrompt.wakeWord.pythonPath"]?.default, "python3");
   });
 
   test("showStatusBarButton defaults to true", () => {
@@ -189,6 +214,11 @@ function run() {
   test("dist/orchestration/voicePromptOrchestrator.js exports VoicePromptOrchestrator", () => {
     const orch = loadDistModule("orchestration/voicePromptOrchestrator");
     assert.equal(typeof orch.VoicePromptOrchestrator, "function");
+  });
+
+  test("dist/wakeword/openWakeWordService.js exports OpenWakeWordService", () => {
+    const wake = loadDistModule("wakeword/openWakeWordService");
+    assert.equal(typeof wake.OpenWakeWordService, "function");
   });
 
   // --- Provider contract interface tests ---

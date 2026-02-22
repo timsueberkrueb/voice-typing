@@ -4,7 +4,7 @@
 
 A VS Code/Cursor extension that captures microphone speech, transcribes it locally, rewrites the transcript into a clean prompt via LLM, and inserts it into the active editor or chat input. Everything runs locally by default.
 
-**Flow:** Mic → whisper.cpp (local STT) → Ollama (local LLM rewrite) → Insert at cursor
+**Flow:** Wake word (`openWakeWord`) or hotkey → whisper.cpp (local STT) → Ollama (local LLM rewrite) → Insert at cursor
 
 **Platforms:** macOS, Linux, Windows — VS Code and Cursor
 
@@ -39,6 +39,8 @@ src/
     whisperCppSttProvider.ts    — shells out to whisper-cli binary (default STT)
     httpSttProvider.ts          — HTTP STT for custom servers (opt-in)
     modelManager.ts             — auto-downloads GGML models from HuggingFace
+  wakeword/
+    openWakeWordService.ts      — background wake-word listener process (openWakeWord)
   rewrite/
     ollamaRewriteProvider.ts    — local Ollama /api/chat with few-shot examples
     cloudRewriteProvider.ts     — OpenAI-compatible cloud rewrite
@@ -56,7 +58,7 @@ src/
 ## Key Design Decisions
 
 1. **Local-first:** No cloud required. whisper.cpp CLI for STT, Ollama for rewrite. Cloud is opt-in only.
-2. **No Python dependency:** Replaced Python stt-server with whisper.cpp CLI binary.
+2. **Minimal Python dependency for wake word:** STT is still whisper.cpp CLI; optional wake-word listener uses `openWakeWord` + `sounddevice`.
 3. **Cross-platform audio:** Auto-detect recorder per platform instead of hardcoding SoX.
 4. **WAV files over pipes:** Record to temp WAV file — simpler, whisper.cpp reads it directly.
 5. **Provider abstraction:** `ISttProvider` and `IRewriteProvider` interfaces make engines swappable.
