@@ -98,6 +98,11 @@ export function activate(context: vscode.ExtensionContext): void {
   };
 
   const runVoicePrompt = async (source: "manual" | "wake-word"): Promise<void> => {
+    if (source === "wake-word" && !vscode.window.state.focused) {
+      wakeOutput.appendLine("[info] Wake event ignored because VS Code window is not focused.");
+      return;
+    }
+
     if (isRunInProgress) {
       if (source === "wake-word") {
         wakeOutput.appendLine("[info] Wake event ignored because a run is already in progress.");
