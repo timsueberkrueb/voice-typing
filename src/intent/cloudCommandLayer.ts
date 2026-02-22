@@ -14,7 +14,8 @@ interface CloudCommandLayerOptions {
 type ToolName =
   | "insert_terminal_command"
   | "execute_vscode_control"
-  | "apply_editor_edit";
+  | "apply_editor_edit"
+  | "search_project_files";
 
 interface ToolCall {
   id: string;
@@ -77,6 +78,7 @@ Routing policy:
    If the request starts with "editor", treat it as editor intent and call execute_vscode_control with the appropriate action.
 3) Otherwise treat it as a code-edit request and call apply_editor_edit with a concrete edit.
    Use the provided editor/terminal context from the user message.
+4) If open_file_at_line fails because the path is wrong or missing, call search_project_files to find likely matches and then retry open_file_at_line with the corrected path.
 
 Rules:
 - Prefer one decisive action.
@@ -144,6 +146,25 @@ const TOOLS = [
           newText: { type: "string" }
         },
         required: ["startLine", "startCharacter", "endLine", "endCharacter", "newText"],
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "search_project_files",
+      description: "Search files/directories in the current workspace by partial name/path.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Partial filename/path or keyword to search for." },
+          maxResults: {
+            type: "number",
+            description: "Maximum number of matches to return (default 20, min 1, max 100)."
+          }
+        },
+        required: ["query"],
         additionalProperties: false
       }
     }
@@ -274,15 +295,22 @@ export class CloudCommandLayer implements ICommandLayer {
 
     const parsed = args as Record<string, unknown>;
 
-    switch (call.function.name) {
-      case "insert_terminal_command":
-        return this.insertTerminalCommand(parsed);
-      case "execute_vscode_control":
-        return this.executeVsCodeControl(parsed);
-      case "apply_editor_edit":
-        return this.applyEditorEdit(parsed);
-      default:
-        return { ok: false, handled: false, error: "Unsupported tool call." };
+    try {
+      switch (call.function.name) {
+        case "insert_terminal_command":
+          return this.insertTerminalCommand(parsed);
+        case "execute_vscode_control":
+          return this.executeVsCodeControl(parsed);
+        case "apply_editor_edit":
+          return this.applyEditorEdit(parsed);
+        case "search_project_files":
+          return this.searchProjectFiles(parsed);
+        default:
+          return { ok: false, handled: false, error: "Unsupported tool call." };
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { ok: false, handled: false, error: message || "Tool execution failed." };
     }
   }
 
@@ -335,7 +363,16 @@ export class CloudCommandLayer implements ICommandLayer {
             ? path.join(workspaceRoot, filePath)
             : filePath;
 
-        const doc = await vscode.workspace.openTextDocument(resolvedPath);
+        let doc: vscode.TextDocument;
+        try {
+          doc = await vscode.workspace.openTextDocument(resolvedPath);
+        } catch {
+          return {
+            ok: false,
+            handled: false,
+            error: `File not found: ${resolvedPath}. Call search_project_files with a partial path and retry with the matched file.`
+          };
+        }
         const editor = await vscode.window.showTextDocument(doc, { preview: false });
 
         const line = normalizeLine(args.line, doc.lineCount);
@@ -355,6 +392,38 @@ export class CloudCommandLayer implements ICommandLayer {
       default:
         return { ok: false, handled: false, error: "Unsupported execute_vscode_control action." };
     }
+  }
+
+  private async searchProjectFiles(args: Record<string, unknown>) {
+    const query = typeof args.query === "string" ? args.query.trim() : "";
+    if (!query) return { ok: false, handled: false, error: "query is required." };
+
+    const requested = typeof args.maxResults === "number" ? Math.floor(args.maxResults) : 20;
+    const maxResults = clampInt(requested, 1, 100);
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!workspaceRoot) {
+      return { ok: false, handled: false, error: "No workspace folder is open." };
+    }
+
+    const escaped = escapeGlob(query);
+    const primary = await vscode.workspace.findFiles(
+      `**/*${escaped}*`,
+      "**/{.git,node_modules,target,dist}/**",
+      maxResults
+    );
+    const primaryPaths = primary.map((u) => path.relative(workspaceRoot, u.fsPath));
+    if (primaryPaths.length > 0) {
+      return { ok: true, handled: false, data: { query, count: primaryPaths.length, files: primaryPaths } };
+    }
+
+    const fallback = await vscode.workspace.findFiles("**/*", "**/{.git,node_modules,target,dist}/**", 5000);
+    const lower = query.toLowerCase();
+    const fuzzyPaths = fallback
+      .map((u) => path.relative(workspaceRoot, u.fsPath))
+      .filter((p) => p.toLowerCase().includes(lower))
+      .slice(0, maxResults);
+
+    return { ok: true, handled: false, data: { query, count: fuzzyPaths.length, files: fuzzyPaths } };
   }
 
   private async applyEditorEdit(args: Record<string, unknown>) {
@@ -617,6 +686,10 @@ function normalizeLine(value: unknown, lineCount: number): number {
 function normalizeColumn(value: unknown): number {
   const n = typeof value === "number" ? Math.floor(value) : 0;
   return Math.max(0, n);
+}
+
+function escapeGlob(value: string): string {
+  return value.replace(/[[\]{}()*?!\\]/g, "\\$&");
 }
 
 function clampInt(n: number, min: number, max: number): number {
