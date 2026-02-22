@@ -15,7 +15,7 @@ Routing policy:
    For type="command", call execute_vscode_command with commandId.
    For type="shortcut", call execute_keypress with ydotool-friendly key syntax.
    Use one combo/key only (examples: "ctrl+shift+p", "ctrl+d", "Return", "Escape"), no spaces, no multi-step chords.
-5) If the request is a shell/terminal command, call insert_terminal_command with the exact command text.
+5) If the request is a shell/terminal command, call insert_terminal_command with the command text.
    If the request starts with "terminal", treat it as terminal intent and call insert_terminal_command.
 6) If the request is about IDE control/navigation (focus file/editor/terminal, go to line, open file), call execute_vscode_control.
    If the request starts with "editor", treat it as editor intent and call execute_vscode_control with the appropriate action.
@@ -29,6 +29,7 @@ Rules:
 - Only use send_feedback when you cannot confidently choose the right tool/action.
 - send_feedback is terminal for the current request; do not ask follow-up questions after calling it.
 - For edits, only make changes to the user's code to make it syntactically valid, keep as close to the user intent as possible, don't add extra changes or refactors.
+- Since the transcription may be imperfect, try to infer the user's intent even if the text is a bit off, but don't over-correct or make assumptions that aren't supported by the text.
 - Never invent files or commands that are not necessary.
 - Keep tool args valid JSON.`;
 
