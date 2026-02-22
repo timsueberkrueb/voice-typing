@@ -140,16 +140,29 @@ export class AudioCaptureService {
     const SAMPLE_RATE = 16000;
     const BYTES_PER_SAMPLE = 2;
     const CHECK_INTERVAL_MS = 100;
-    const SILENCE_THRESHOLD = 150;
+    const BASE_SILENCE_THRESHOLD = 150;
+    const AMBIENT_EMA_ALPHA = 0.12;
     const MIN_RECORDING_MS = 1500;
 
     const msToBytes = (ms: number) =>
       Math.floor((ms / 1000) * SAMPLE_RATE * BYTES_PER_SAMPLE);
 
     const silenceWindowBytes = msToBytes(vadSilenceMs);
+    const liveWindowBytes = msToBytes(CHECK_INTERVAL_MS);
 
     let speechDetected = false;
     let speechDetectedAt = 0;
+    let ambientRms = BASE_SILENCE_THRESHOLD;
+    let ambientInitialized = false;
+
+    const updateAmbient = (rms: number): void => {
+      if (!ambientInitialized) {
+        ambientRms = Math.max(rms, BASE_SILENCE_THRESHOLD);
+        ambientInitialized = true;
+        return;
+      }
+      ambientRms = (ambientRms * (1 - AMBIENT_EMA_ALPHA)) + (rms * AMBIENT_EMA_ALPHA);
+    };
 
     const timer = setInterval(async () => {
       if (proc.killed) {
@@ -167,11 +180,17 @@ export class AudioCaptureService {
       }
 
       const totalBytes = pcmData.length;
+      const currentRms = rmsAmplitude(getRecentSamples(pcmData, liveWindowBytes));
+      const adaptiveThreshold = computeAdaptiveVadThreshold(
+        ambientRms,
+        BASE_SILENCE_THRESHOLD
+      );
 
       if (!speechDetected) {
+        updateAmbient(currentRms);
         if (totalBytes >= msToBytes(vadMinSpeechMs)) {
           const recent = getRecentSamples(pcmData, msToBytes(vadMinSpeechMs));
-          if (rmsAmplitude(recent) > SILENCE_THRESHOLD) {
+          if (rmsAmplitude(recent) > adaptiveThreshold) {
             speechDetected = true;
             speechDetectedAt = Date.now();
           }
@@ -193,7 +212,11 @@ export class AudioCaptureService {
       }
 
       const tail = getRecentSamples(pcmData, silenceWindowBytes);
-      if (rmsAmplitude(tail) < SILENCE_THRESHOLD) {
+      const tailRms = rmsAmplitude(tail);
+      if (tailRms < adaptiveThreshold * 1.15) {
+        updateAmbient(tailRms);
+      }
+      if (tailRms < adaptiveThreshold) {
         stopRecording();
         clearInterval(timer);
       }
@@ -385,6 +408,18 @@ function rmsAmplitude(pcm16: Buffer): number {
     sumSquares += sample * sample;
   }
   return Math.sqrt(sumSquares / sampleCount);
+}
+
+function computeAdaptiveVadThreshold(
+  ambientRms: number,
+  baseline: number
+): number {
+  const adaptive = (ambientRms * 1.6) + 80;
+  return clamp(adaptive, baseline, 1200);
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }
 
 export async function cleanupWavFile(wavPath: string): Promise<void> {
