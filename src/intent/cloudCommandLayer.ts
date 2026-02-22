@@ -291,7 +291,7 @@ export class CloudCommandLayer implements ICommandLayer {
     if (!command) return { ok: false, handled: false, error: "command is required." };
 
     const terminal = vscode.window.activeTerminal ?? vscode.window.createTerminal();
-    terminal.show(true);
+    terminal.show(false);
     terminal.sendText(command, false);
     this.terminalContext.recordInsertedCommand(terminal, command);
 
