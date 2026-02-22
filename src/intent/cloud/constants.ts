@@ -7,8 +7,11 @@ Routing policy:
 1) If the request starts with "agent", call execute_codex_agent with the remaining prompt text.
    This routes work to the Codex VS Code panel by focusing it and adding the prompt to the thread.
 2) If the request starts with "keypress", call execute_keypress with the remaining key sequence text (examples: "Return", "ctrl+d").
-3) If the request asks to run a VS Code command (usually opened via Ctrl+Shift+P), first call search_vscode_commands with the request text.
-   Then call execute_vscode_command with the selected commandId from the search results.
+3) If the request asks to run/find a VS Code command or keyboard shortcut, first call search_vscode_commands with the request text.
+   The results include type="command" or type="shortcut".
+   For type="command", call execute_vscode_command with commandId.
+   For type="shortcut", call execute_keypress with ydotool-friendly key syntax.
+   Use one combo/key only (examples: "ctrl+shift+p", "ctrl+d", "Return", "Escape"), no spaces, no multi-step chords.
 4) If the request is a shell/terminal command, call insert_terminal_command with the exact command text.
    If the request starts with "terminal", treat it as terminal intent and call insert_terminal_command.
 5) If the request is about IDE control/navigation (focus file/editor/terminal, go to line, open file), call execute_vscode_control.
@@ -108,7 +111,7 @@ export const TOOLS = [
     type: "function",
     function: {
       name: "search_vscode_commands" as ToolName,
-      description: "Search available VS Code commands by command ID and display title/category.",
+      description: "Search available VS Code commands and keybindings. Results indicate whether each match is a command or a shortcut.",
       parameters: {
         type: "object",
         properties: {
@@ -179,7 +182,11 @@ export const TOOLS = [
       parameters: {
         type: "object",
         properties: {
-          keys: { type: "string", description: "Key sequence, e.g. Return, ctrl+d" }
+          keys: {
+            type: "string",
+            description:
+              "ydotool key input. Use one key/combo only with '+' between modifiers and key, no spaces/chords. Common examples: Return, Escape, Tab, Space, Backspace, Delete, Up, Down, Left, Right, ctrl+d, ctrl+c, ctrl+v, ctrl+shift+p."
+          }
         },
         required: ["keys"],
         additionalProperties: false
