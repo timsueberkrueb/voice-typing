@@ -13,6 +13,8 @@ export type ToolName =
   | "search_project_files"
   | "search_vscode_commands"
   | "execute_vscode_command"
+  | "read_clipboard"
+  | "write_clipboard"
   | "execute_codex_agent"
   | "execute_keypress";
 

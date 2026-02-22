@@ -7,18 +7,21 @@ Routing policy:
 1) If the request starts with "agent", call execute_codex_agent with the remaining prompt text.
    This routes work to the Codex VS Code panel by focusing it and adding the prompt to the thread.
 2) If the request starts with "keypress", call execute_keypress with the remaining key sequence text (examples: "Return", "ctrl+d").
-3) If the request asks to run/find a VS Code command or keyboard shortcut, first call search_vscode_commands with the request text.
+3) If the request is about clipboard read/write (copy, paste, yank, clipboard text), use clipboard tools.
+   Use read_clipboard to read clipboard text and write_clipboard to set clipboard text.
+   Prefer clipboard tools over ctrl+c/ctrl+v unless the user explicitly asks for keypress behavior.
+4) If the request asks to run/find a VS Code command or keyboard shortcut, first call search_vscode_commands with the request text.
    The results include type="command" or type="shortcut".
    For type="command", call execute_vscode_command with commandId.
    For type="shortcut", call execute_keypress with ydotool-friendly key syntax.
    Use one combo/key only (examples: "ctrl+shift+p", "ctrl+d", "Return", "Escape"), no spaces, no multi-step chords.
-4) If the request is a shell/terminal command, call insert_terminal_command with the exact command text.
+5) If the request is a shell/terminal command, call insert_terminal_command with the exact command text.
    If the request starts with "terminal", treat it as terminal intent and call insert_terminal_command.
-5) If the request is about IDE control/navigation (focus file/editor/terminal, go to line, open file), call execute_vscode_control.
+6) If the request is about IDE control/navigation (focus file/editor/terminal, go to line, open file), call execute_vscode_control.
    If the request starts with "editor", treat it as editor intent and call execute_vscode_control with the appropriate action.
-6) Otherwise treat it as a code-edit request and call apply_editor_edit with a concrete edit.
+7) Otherwise treat it as a code-edit request and call apply_editor_edit with a concrete edit.
    Use the provided editor/terminal context from the user message.
-7) If open_file_at_line fails because the path is wrong or missing, call search_project_files to find likely matches and then retry open_file_at_line with the corrected path.
+8) If open_file_at_line fails because the path is wrong or missing, call search_project_files to find likely matches and then retry open_file_at_line with the corrected path.
 
 Rules:
 - Prefer one decisive action.
@@ -161,6 +164,33 @@ export const TOOLS = [
   {
     type: "function",
     function: {
+      name: "read_clipboard" as ToolName,
+      description: "Read text from the system clipboard.",
+      parameters: {
+        type: "object",
+        properties: {},
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "write_clipboard" as ToolName,
+      description: "Write text to the system clipboard.",
+      parameters: {
+        type: "object",
+        properties: {
+          text: { type: "string", description: "Text to store in clipboard." }
+        },
+        required: ["text"],
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
       name: "execute_codex_agent" as ToolName,
       description:
         "Use Codex integration in VS Code for agent-prefixed requests by focusing Codex panel and adding prompt text as a temporary file to the thread.",
@@ -185,7 +215,7 @@ export const TOOLS = [
           keys: {
             type: "string",
             description:
-              "ydotool key input. Use one key/combo only with '+' between modifiers and key, no spaces/chords. Common examples: Return, Escape, Tab, Space, Backspace, Delete, Up, Down, Left, Right, ctrl+d, ctrl+c, ctrl+v, ctrl+shift+p."
+              "ydotool key input. Use one key/combo only with '+' between modifiers and key, no spaces/chords. Common examples: Return, Escape, Tab, Space, Backspace, Delete, Up, Down, Left, Right, ctrl+d, ctrl+shift+p."
           }
         },
         required: ["keys"],

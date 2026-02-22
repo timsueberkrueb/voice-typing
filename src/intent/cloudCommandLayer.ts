@@ -24,8 +24,10 @@ import { executeVsCodeControlTool } from "./cloud/tools/executeVsCodeControlTool
 import { executeKeypressTool } from "./cloud/tools/executeKeypressTool";
 import { executeCodexAgentTool } from "./cloud/tools/executeCodexAgentTool";
 import { insertTerminalCommandTool } from "./cloud/tools/insertTerminalCommandTool";
+import { readClipboardTool } from "./cloud/tools/readClipboardTool";
 import { searchVsCodeCommandsTool } from "./cloud/tools/searchVsCodeCommandsTool";
 import { searchProjectFilesTool } from "./cloud/tools/searchProjectFilesTool";
+import { writeClipboardTool } from "./cloud/tools/writeClipboardTool";
 import {
   CloudCommandLayerOptions,
   ResponsesApiPayload,
@@ -155,6 +157,10 @@ export class CloudCommandLayer implements ICommandLayer {
           return searchVsCodeCommandsTool(parsed);
         case "execute_vscode_command":
           return executeVsCodeCommandTool(parsed);
+        case "read_clipboard":
+          return readClipboardTool();
+        case "write_clipboard":
+          return writeClipboardTool(parsed);
         case "execute_codex_agent":
           return executeCodexAgentTool(parsed);
         case "execute_keypress":
