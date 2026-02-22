@@ -55,7 +55,7 @@ export class VoicePromptOrchestrator {
       const raw = await this.transcribeWithRetry(audio);
       const sttMs = Date.now() - t1;
       void cleanupWavFile(audio.wavPath);
-      const sourceText = raw.text.trim();
+      const sourceText = normalizeTranscript(raw.text);
 
       if (!sourceText) {
         clearStatus();
@@ -69,6 +69,11 @@ export class VoicePromptOrchestrator {
       let routeMs = 0;
       const t2 = Date.now();
       if (this.deps.settings.commandProvider === "chatgpt") {
+        if (!sourceText.trim()) {
+          clearStatus();
+          return;
+        }
+
         if (!this.deps.cloudCommandLayer) {
           clearStatus();
           void vscode.window.showErrorMessage(
@@ -77,7 +82,7 @@ export class VoicePromptOrchestrator {
           return;
         }
 
-        setStatus("$(sync~spin) Routing intent...");
+        setStatus(`$(sync~spin) Routing intent: ${statusPreview(sourceText)}`);
         const handled = await this.deps.cloudCommandLayer.route(sourceText);
         routeMs = Date.now() - t2;
 
@@ -145,4 +150,25 @@ export class VoicePromptOrchestrator {
       throw new Error("Transcription failed.");
     }
   }
+}
+
+function statusPreview(text: string): string {
+  const singleLine = text.replace(/\s+/g, " ").trim();
+  const maxLen = 72;
+  if (singleLine.length <= maxLen) return singleLine;
+  return `${singleLine.slice(0, maxLen - 1)}...`;
+}
+
+function normalizeTranscript(text: string): string {
+  const trimmed = text.trim();
+  if (isWhisperNoSpeechMarker(trimmed)) return "";
+  return trimmed;
+}
+
+const WHISPER_NO_SPEECH_MARKERS = new Set(["[BLANK_AUDIO]", "<|nospeech|>"]);
+
+function isWhisperNoSpeechMarker(text: string): boolean {
+  const tokens = text.split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return false;
+  return tokens.every((token) => WHISPER_NO_SPEECH_MARKERS.has(token));
 }
