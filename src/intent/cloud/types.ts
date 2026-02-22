@@ -11,6 +11,8 @@ export type ToolName =
   | "execute_vscode_control"
   | "apply_editor_edit"
   | "search_project_files"
+  | "search_vscode_commands"
+  | "execute_vscode_command"
   | "execute_codex_agent"
   | "execute_keypress";
 

@@ -218,6 +218,7 @@
     "typescript": "^5.8.2"
   },
   "dependencies": {
+    "fuse.js": "^7.1.0",
     "openai": "^5.23.0",
     "undici": "^7.5.0"
   }

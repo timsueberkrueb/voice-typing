@@ -19,10 +19,12 @@ import {
 } from "./cloud/responsesApi";
 import { TerminalContextTracker } from "./cloud/terminalContextTracker";
 import { applyEditorEditTool } from "./cloud/tools/applyEditorEditTool";
+import { executeVsCodeCommandTool } from "./cloud/tools/executeVsCodeCommandTool";
 import { executeVsCodeControlTool } from "./cloud/tools/executeVsCodeControlTool";
 import { executeKeypressTool } from "./cloud/tools/executeKeypressTool";
 import { executeCodexAgentTool } from "./cloud/tools/executeCodexAgentTool";
 import { insertTerminalCommandTool } from "./cloud/tools/insertTerminalCommandTool";
+import { searchVsCodeCommandsTool } from "./cloud/tools/searchVsCodeCommandsTool";
 import { searchProjectFilesTool } from "./cloud/tools/searchProjectFilesTool";
 import {
   CloudCommandLayerOptions,
@@ -149,6 +151,10 @@ export class CloudCommandLayer implements ICommandLayer {
           return applyEditorEditTool(parsed);
         case "search_project_files":
           return searchProjectFilesTool(parsed);
+        case "search_vscode_commands":
+          return searchVsCodeCommandsTool(parsed);
+        case "execute_vscode_command":
+          return executeVsCodeCommandTool(parsed);
         case "execute_codex_agent":
           return executeCodexAgentTool(parsed);
         case "execute_keypress":

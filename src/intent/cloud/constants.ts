@@ -7,13 +7,15 @@ Routing policy:
 1) If the request starts with "agent", call execute_codex_agent with the remaining prompt text.
    This routes work to the Codex VS Code panel by focusing it and adding the prompt to the thread.
 2) If the request starts with "keypress", call execute_keypress with the remaining key sequence text (examples: "Return", "ctrl+d").
-3) If the request is a shell/terminal command, call insert_terminal_command with the exact command text.
+3) If the request asks to run a VS Code command (usually opened via Ctrl+Shift+P), first call search_vscode_commands with the request text.
+   Then call execute_vscode_command with the selected commandId from the search results.
+4) If the request is a shell/terminal command, call insert_terminal_command with the exact command text.
    If the request starts with "terminal", treat it as terminal intent and call insert_terminal_command.
-4) If the request is about IDE control/navigation (focus file/editor/terminal, go to line, open file), call execute_vscode_control.
+5) If the request is about IDE control/navigation (focus file/editor/terminal, go to line, open file), call execute_vscode_control.
    If the request starts with "editor", treat it as editor intent and call execute_vscode_control with the appropriate action.
-5) Otherwise treat it as a code-edit request and call apply_editor_edit with a concrete edit.
+6) Otherwise treat it as a code-edit request and call apply_editor_edit with a concrete edit.
    Use the provided editor/terminal context from the user message.
-6) If open_file_at_line fails because the path is wrong or missing, call search_project_files to find likely matches and then retry open_file_at_line with the corrected path.
+7) If open_file_at_line fails because the path is wrong or missing, call search_project_files to find likely matches and then retry open_file_at_line with the corrected path.
 
 Rules:
 - Prefer one decisive action.
@@ -98,6 +100,57 @@ export const TOOLS = [
           }
         },
         required: ["query"],
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "search_vscode_commands" as ToolName,
+      description: "Search available VS Code commands by command ID and display title/category.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Partial command name, title, or keyword." },
+          maxResults: {
+            type: "number",
+            description: "Maximum number of matches to return (default 20, min 1, max 100)."
+          },
+          includeInternal: {
+            type: "boolean",
+            description: "Include internal commands starting with underscore (default false)."
+          }
+        },
+        required: ["query"],
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "execute_vscode_command" as ToolName,
+      description: "Execute a VS Code command by command ID.",
+      parameters: {
+        type: "object",
+        properties: {
+          commandId: { type: "string", description: "VS Code command ID to execute." },
+          args: {
+            type: "array",
+            description: "Optional positional arguments passed to vscode.commands.executeCommand.",
+            items: {
+              anyOf: [
+                { type: "string" },
+                { type: "number" },
+                { type: "boolean" },
+                { type: "object" },
+                { type: "null" }
+              ]
+            }
+          }
+        },
+        required: ["commandId"],
         additionalProperties: false
       }
     }
