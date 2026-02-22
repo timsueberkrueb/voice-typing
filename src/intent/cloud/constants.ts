@@ -6,13 +6,14 @@ You must decide the best action for the user's transcribed request by calling to
 Routing policy:
 1) If the request starts with "agent", call execute_codex_agent with the remaining prompt text.
    This routes work to the Codex VS Code panel by focusing it and adding the prompt to the thread.
-2) If the request is a shell/terminal command, call insert_terminal_command with the exact command text.
+2) If the request starts with "keypress", call execute_keypress with the remaining key sequence text (examples: "Return", "ctrl+d").
+3) If the request is a shell/terminal command, call insert_terminal_command with the exact command text.
    If the request starts with "terminal", treat it as terminal intent and call insert_terminal_command.
-3) If the request is about IDE control/navigation (focus file/editor/terminal, go to line, open file), call execute_vscode_control.
+4) If the request is about IDE control/navigation (focus file/editor/terminal, go to line, open file), call execute_vscode_control.
    If the request starts with "editor", treat it as editor intent and call execute_vscode_control with the appropriate action.
-4) Otherwise treat it as a code-edit request and call apply_editor_edit with a concrete edit.
+5) Otherwise treat it as a code-edit request and call apply_editor_edit with a concrete edit.
    Use the provided editor/terminal context from the user message.
-5) If open_file_at_line fails because the path is wrong or missing, call search_project_files to find likely matches and then retry open_file_at_line with the corrected path.
+6) If open_file_at_line fails because the path is wrong or missing, call search_project_files to find likely matches and then retry open_file_at_line with the corrected path.
 
 Rules:
 - Prefer one decisive action.
@@ -113,6 +114,21 @@ export const TOOLS = [
           prompt: { type: "string", description: "Prompt text to send to Codex." }
         },
         required: ["prompt"],
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "execute_keypress" as ToolName,
+      description: "Send a keypress to the currently focused Linux application using ydotool.",
+      parameters: {
+        type: "object",
+        properties: {
+          keys: { type: "string", description: "Key sequence, e.g. Return, ctrl+d" }
+        },
+        required: ["keys"],
         additionalProperties: false
       }
     }

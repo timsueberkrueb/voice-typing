@@ -20,6 +20,7 @@ import {
 import { TerminalContextTracker } from "./cloud/terminalContextTracker";
 import { applyEditorEditTool } from "./cloud/tools/applyEditorEditTool";
 import { executeVsCodeControlTool } from "./cloud/tools/executeVsCodeControlTool";
+import { executeKeypressTool } from "./cloud/tools/executeKeypressTool";
 import { executeCodexAgentTool } from "./cloud/tools/executeCodexAgentTool";
 import { insertTerminalCommandTool } from "./cloud/tools/insertTerminalCommandTool";
 import { searchProjectFilesTool } from "./cloud/tools/searchProjectFilesTool";
@@ -150,6 +151,8 @@ export class CloudCommandLayer implements ICommandLayer {
           return searchProjectFilesTool(parsed);
         case "execute_codex_agent":
           return executeCodexAgentTool(parsed);
+        case "execute_keypress":
+          return executeKeypressTool(parsed);
         default:
           return { ok: false, handled: false, error: "Unsupported tool call." };
       }

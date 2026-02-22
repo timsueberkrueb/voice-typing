@@ -11,7 +11,8 @@ export type ToolName =
   | "execute_vscode_control"
   | "apply_editor_edit"
   | "search_project_files"
-  | "execute_codex_agent";
+  | "execute_codex_agent"
+  | "execute_keypress";
 
 export interface ToolCall {
   id: string;
