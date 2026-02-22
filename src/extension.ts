@@ -1,11 +1,10 @@
 import * as vscode from "vscode";
 import { AudioCaptureService } from "./audio/audioCaptureService";
-import { SecretsManager } from "./config/secrets";
+import { loadCodexAuthFromDisk } from "./config/codexAuth";
 import { readSettings } from "./config/settings";
 import { CursorInputInjector } from "./inject/cursorInputInjector";
+import { CloudCommandLayer } from "./intent/cloudCommandLayer";
 import { VoicePromptOrchestrator } from "./orchestration/voicePromptOrchestrator";
-import { CloudRewriteProvider } from "./rewrite/cloudRewriteProvider";
-import { OllamaRewriteProvider } from "./rewrite/ollamaRewriteProvider";
 import { WhisperCppSttProvider, findWhisperCppBinary } from "./stt/whisperCppSttProvider";
 import { HttpSttProvider } from "./stt/httpSttProvider";
 import { ModelManager } from "./stt/modelManager";
@@ -15,7 +14,6 @@ const START_RECORDING_COMMAND = "voicePrompt.startRecording";
 
 export function activate(context: vscode.ExtensionContext): void {
   const settings = readSettings();
-  const secrets = new SecretsManager(context.secrets);
   const modelManager = new ModelManager(context.globalStorageUri);
 
   const audioCapture = new AudioCaptureService({
@@ -24,28 +22,27 @@ export function activate(context: vscode.ExtensionContext): void {
     vadMinSpeechMs: settings.vadMinSpeechMs,
   });
 
-  const baseOllamaProvider =
-    settings.rewriteProvider === "none"
-      ? undefined
-      : new OllamaRewriteProvider({
-          baseUrl: settings.rewriteOllamaBaseUrl,
-          model: settings.rewriteModel,
-          timeoutMs: settings.rewriteTimeoutMs,
-        });
+  const cloudCommandLayerFactory = async (): Promise<CloudCommandLayer | undefined> => {
+    if (settings.commandProvider === "chatgpt") {
+      const auth = await loadCodexAuthFromDisk();
+      if (!auth) {
+        return undefined;
+      }
 
-  const cloudRewriteProviderFactory = async (): Promise<
-    CloudRewriteProvider | undefined
-  > => {
-    const key = await secrets.getCloudApiKey();
-    if (!key) {
-      return undefined;
+      const extraHeaders = auth.accountId
+        ? { "ChatGPT-Account-ID": auth.accountId }
+        : undefined;
+
+      return new CloudCommandLayer({
+        apiUrl: settings.commandChatgptBaseUrl,
+        model: settings.commandChatgptModel,
+        bearerToken: auth.accessToken,
+        timeoutMs: settings.commandTimeoutMs,
+        extraHeaders
+      });
     }
-    return new CloudRewriteProvider({
-      apiUrl: settings.rewriteCloudBaseUrl,
-      model: settings.rewriteModel,
-      apiKey: key,
-      timeoutMs: settings.rewriteTimeoutMs,
-    });
+
+    return undefined;
   };
 
   let sttProvider: ISttProvider | undefined;
@@ -102,15 +99,14 @@ export function activate(context: vscode.ExtensionContext): void {
       try {
         const currentStt = await resolveSttProvider();
 
-        const cloudProvider = await cloudRewriteProviderFactory();
-        const primaryRewriteProvider =
-          settings.rewriteProvider === "cloud" ? cloudProvider : baseOllamaProvider;
-        const fallbackCloudProvider =
-          settings.rewriteProvider === "cloud" ? undefined : cloudProvider;
+        const cloudCommandLayer =
+          settings.commandProvider === "chatgpt"
+            ? await cloudCommandLayerFactory()
+            : undefined;
 
-        if (settings.rewriteProvider === "cloud" && !cloudProvider) {
+        if (settings.commandProvider === "chatgpt" && !cloudCommandLayer) {
           void vscode.window.showWarningMessage(
-            "Cloud API key missing. Run 'Voice Prompt: Set Cloud API Key'."
+            "ChatGPT auth missing. Ensure ~/.codex/auth.json exists and has tokens.access_token."
           );
         }
 
@@ -118,8 +114,7 @@ export function activate(context: vscode.ExtensionContext): void {
           settings,
           audioCapture,
           sttProvider: currentStt,
-          rewriteProvider: primaryRewriteProvider,
-          cloudRewriteProvider: fallbackCloudProvider,
+          cloudCommandLayer,
           inputInjector: new CursorInputInjector(settings.insertTrailingSpace),
         });
 
@@ -131,24 +126,6 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   );
   context.subscriptions.push(startRecordingDisposable);
-
-  const setCloudApiKeyDisposable = vscode.commands.registerCommand(
-    "voicePrompt.setCloudApiKey",
-    async () => {
-      const apiKey = await vscode.window.showInputBox({
-        title: "Voice Prompt Cloud API Key",
-        prompt: "Paste API key for cloud rewrite provider",
-        password: true,
-        ignoreFocusOut: true,
-      });
-      if (!apiKey) {
-        return;
-      }
-      await secrets.setCloudApiKey(apiKey);
-      void vscode.window.showInformationMessage("Cloud API key saved securely.");
-    }
-  );
-  context.subscriptions.push(setCloudApiKeyDisposable);
 
   if (settings.showStatusBarButton) {
     const item = vscode.window.createStatusBarItem(

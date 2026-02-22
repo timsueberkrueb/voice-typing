@@ -1,7 +1,7 @@
 {
   "name": "voice-prompt",
   "displayName": "Voice Typing",
-  "description": "Capture voice, rewrite into clean prompts, and inject into VS Code / Cursor input.",
+  "description": "Capture voice, route command intent, and inject into VS Code / Cursor input.",
   "version": "0.2.1",
   "publisher": "qingy-wu",
   "repository": {
@@ -37,18 +37,13 @@
   "icon": "icon.png",
   "main": "./dist/extension.js",
   "activationEvents": [
-    "onCommand:voicePrompt.startRecording",
-    "onCommand:voicePrompt.setCloudApiKey"
+    "onCommand:voicePrompt.startRecording"
   ],
   "contributes": {
     "commands": [
       {
         "command": "voicePrompt.startRecording",
         "title": "Voice Prompt: Start Recording"
-      },
-      {
-        "command": "voicePrompt.setCloudApiKey",
-        "title": "Voice Prompt: Set Cloud API Key"
       }
     ],
     "keybindings": [
@@ -112,55 +107,37 @@
           "default": "auto",
           "description": "Language code for speech recognition. Use 'auto' to detect automatically, or a specific code like 'en', 'zh', 'ja', 'ko', etc."
         },
-        "voicePrompt.rewrite.provider": {
+        "voicePrompt.command.provider": {
           "type": "string",
-          "default": "ollama",
-          "enum": ["ollama", "cloud", "none"],
-          "description": "Rewrite provider."
+          "default": "none",
+          "enum": ["chatgpt", "none"],
+          "enumDescriptions": [
+            "ChatGPT subscription token from ~/.codex/auth.json",
+            "Disable command routing layer"
+          ],
+          "description": "Command layer provider."
         },
-        "voicePrompt.rewrite.model": {
+        "voicePrompt.command.chatgptModel": {
           "type": "string",
-          "default": "llama3.2:3b",
-          "description": "Rewrite model identifier."
+          "default": "gpt-5-codex-mini",
+          "description": "ChatGPT command layer model identifier."
         },
-        "voicePrompt.rewrite.cloudBaseUrl": {
+        "voicePrompt.command.chatgptBaseUrl": {
           "type": "string",
-          "default": "https://api.openai.com/v1/chat/completions",
-          "description": "Cloud rewrite API endpoint (OpenAI-compatible)."
+          "default": "https://chatgpt.com/backend-api/codex/responses",
+          "description": "ChatGPT command layer endpoint (Codex-compatible)."
         },
-        "voicePrompt.rewrite.ollamaBaseUrl": {
-          "type": "string",
-          "default": "http://127.0.0.1:11434",
-          "description": "Ollama base URL."
-        },
-        "voicePrompt.rewrite.timeoutMs": {
+        "voicePrompt.command.timeoutMs": {
           "type": "number",
           "default": 20000,
           "minimum": 1000,
           "maximum": 120000,
-          "description": "Rewrite request timeout in milliseconds."
-        },
-        "voicePrompt.rewrite.style": {
-          "type": "string",
-          "default": "engineering",
-          "enum": ["concise", "detailed", "engineering", "debugging"],
-          "description": "Rewrite style preset."
+          "description": "Command layer request timeout in milliseconds."
         },
         "voicePrompt.previewBeforeInsert": {
           "type": "boolean",
           "default": false,
           "description": "Show editable preview before insertion."
-        },
-        "voicePrompt.autoFallbackToCloud": {
-          "type": "boolean",
-          "default": false,
-          "description": "Fallback to cloud provider if local rewrite fails."
-        },
-        "voicePrompt.noRewriteBehavior": {
-          "type": "string",
-          "default": "stt_passthrough",
-          "enum": ["stt_passthrough", "disable_plugin"],
-          "description": "Behavior when no rewrite backend is available."
         },
         "voicePrompt.showStatusBarButton": {
           "type": "boolean",
@@ -211,6 +188,7 @@
     "typescript": "^5.8.2"
   },
   "dependencies": {
+    "openai": "^5.23.0",
     "undici": "^7.5.0"
   }
 }

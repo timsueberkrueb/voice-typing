@@ -90,8 +90,8 @@ function run() {
     assert.ok(commands.some((c) => c.command === "voicePrompt.startRecording"));
   });
 
-  test("has setCloudApiKey command", () => {
-    assert.ok(commands.some((c) => c.command === "voicePrompt.setCloudApiKey"));
+  test("does not expose setCloudApiKey command", () => {
+    assert.ok(!commands.some((c) => c.command === "voicePrompt.setCloudApiKey"));
   });
 
   test("has keybinding for startRecording", () => {
@@ -103,8 +103,8 @@ function run() {
     assert.equal(props["voicePrompt.vad.enabled"]?.default, true);
   });
 
-  test("vad.silenceMs defaults to 900", () => {
-    assert.equal(props["voicePrompt.vad.silenceMs"]?.default, 900);
+  test("vad.silenceMs defaults to 1500", () => {
+    assert.equal(props["voicePrompt.vad.silenceMs"]?.default, 1500);
   });
 
   test("vad.minSpeechMs defaults to 300", () => {
@@ -115,28 +115,37 @@ function run() {
     assert.equal(props["voicePrompt.showStatusBarButton"]?.default, true);
   });
 
-  test("noRewriteBehavior defaults to stt_passthrough", () => {
-    assert.equal(props["voicePrompt.noRewriteBehavior"]?.default, "stt_passthrough");
-  });
-
   test("previewBeforeInsert defaults to false", () => {
     assert.equal(props["voicePrompt.previewBeforeInsert"]?.default, false);
   });
 
-  test("rewrite.provider default is ollama", () => {
-    assert.equal(props["voicePrompt.rewrite.provider"]?.default, "ollama");
+  test("command.provider default is none", () => {
+    assert.equal(props["voicePrompt.command.provider"]?.default, "none");
   });
 
-  test("stt.provider default is local", () => {
-    assert.equal(props["voicePrompt.stt.provider"]?.default, "local");
+  test("command.provider supports chatgpt mode", () => {
+    const enumValues = props["voicePrompt.command.provider"]?.enum ?? [];
+    assert.ok(enumValues.includes("chatgpt"));
+    assert.ok(!enumValues.includes("cloud"));
   });
 
-  test("rewrite.style default is engineering", () => {
-    assert.equal(props["voicePrompt.rewrite.style"]?.default, "engineering");
+  test("stt.provider default is whisper-cpp", () => {
+    assert.equal(props["voicePrompt.stt.provider"]?.default, "whisper-cpp");
   });
 
-  test("autoFallbackToCloud defaults to false", () => {
-    assert.equal(props["voicePrompt.autoFallbackToCloud"]?.default, false);
+  test("command.chatgptModel default is gpt-5-codex-mini", () => {
+    assert.equal(props["voicePrompt.command.chatgptModel"]?.default, "gpt-5-codex-mini");
+  });
+
+  test("command.timeoutMs defaults to 20000", () => {
+    assert.equal(props["voicePrompt.command.timeoutMs"]?.default, 20000);
+  });
+
+  test("command.chatgptBaseUrl default is codex endpoint", () => {
+    assert.equal(
+      props["voicePrompt.command.chatgptBaseUrl"]?.default,
+      "https://chatgpt.com/backend-api/codex/responses"
+    );
   });
 
   // --- Source module structure tests ---
@@ -157,29 +166,19 @@ function run() {
     assert.equal(typeof settings.readSettings, "function");
   });
 
-  test("dist/config/secrets.js exports SecretsManager", () => {
-    const secrets = loadDistModule("config/secrets");
-    assert.equal(typeof secrets.SecretsManager, "function");
-  });
-
   test("dist/audio/audioCaptureService.js exports AudioCaptureService", () => {
     const audio = loadDistModule("audio/audioCaptureService");
     assert.equal(typeof audio.AudioCaptureService, "function");
   });
 
-  test("dist/stt/localSttProvider.js exports LocalSttProvider", () => {
-    const stt = loadDistModule("stt/localSttProvider");
-    assert.equal(typeof stt.LocalSttProvider, "function");
+  test("dist/stt/whisperCppSttProvider.js exports WhisperCppSttProvider", () => {
+    const stt = loadDistModule("stt/whisperCppSttProvider");
+    assert.equal(typeof stt.WhisperCppSttProvider, "function");
   });
 
-  test("dist/rewrite/ollamaRewriteProvider.js exports OllamaRewriteProvider", () => {
-    const rewrite = loadDistModule("rewrite/ollamaRewriteProvider");
-    assert.equal(typeof rewrite.OllamaRewriteProvider, "function");
-  });
-
-  test("dist/rewrite/cloudRewriteProvider.js exports CloudRewriteProvider", () => {
-    const rewrite = loadDistModule("rewrite/cloudRewriteProvider");
-    assert.equal(typeof rewrite.CloudRewriteProvider, "function");
+  test("dist/intent/cloudCommandLayer.js exports CloudCommandLayer", () => {
+    const layer = loadDistModule("intent/cloudCommandLayer");
+    assert.equal(typeof layer.CloudCommandLayer, "function");
   });
 
   test("dist/inject/cursorInputInjector.js exports CursorInputInjector", () => {
@@ -194,47 +193,35 @@ function run() {
 
   // --- Provider contract interface tests ---
 
-  test("LocalSttProvider implements transcribe method", () => {
-    const { LocalSttProvider } = loadDistModule("stt/localSttProvider");
-    const provider = new LocalSttProvider({
-      endpoint: "http://127.0.0.1:0/test",
-      model: "test",
+  test("WhisperCppSttProvider implements transcribe method", () => {
+    const { WhisperCppSttProvider } = loadDistModule("stt/whisperCppSttProvider");
+    const provider = new WhisperCppSttProvider({
+      binaryPath: "whisper-cpp",
+      modelPath: "/tmp/model.ggml",
+      language: "en",
       timeoutMs: 1000
     });
     assert.equal(typeof provider.transcribe, "function");
   });
 
-  test("OllamaRewriteProvider implements rewrite method", () => {
-    const { OllamaRewriteProvider } = loadDistModule("rewrite/ollamaRewriteProvider");
-    const provider = new OllamaRewriteProvider({
-      baseUrl: "http://127.0.0.1:0",
-      model: "test",
+  test("HttpSttProvider implements transcribe method", () => {
+    const { HttpSttProvider } = loadDistModule("stt/httpSttProvider");
+    const provider = new HttpSttProvider({
+      endpoint: "http://127.0.0.1:0/test",
       timeoutMs: 1000
     });
-    assert.equal(typeof provider.rewrite, "function");
+    assert.equal(typeof provider.transcribe, "function");
   });
 
-  test("CloudRewriteProvider implements rewrite method", () => {
-    const { CloudRewriteProvider } = loadDistModule("rewrite/cloudRewriteProvider");
-    const provider = new CloudRewriteProvider({
+  test("CloudCommandLayer implements route method", () => {
+    const { CloudCommandLayer } = loadDistModule("intent/cloudCommandLayer");
+    const layer = new CloudCommandLayer({
       apiUrl: "http://127.0.0.1:0",
       model: "test",
-      apiKey: "test-key",
+      bearerToken: "test-key",
       timeoutMs: 1000
     });
-    assert.equal(typeof provider.rewrite, "function");
-  });
-
-  // --- STT sidecar file tests ---
-
-  test("stt-server/server.py exists", () => {
-    const serverPath = path.join(__dirname, "..", "stt-server", "server.py");
-    assert.ok(fs.existsSync(serverPath), "stt-server/server.py is missing");
-  });
-
-  test("stt-server/requirements.txt exists", () => {
-    const reqPath = path.join(__dirname, "..", "stt-server", "requirements.txt");
-    assert.ok(fs.existsSync(reqPath), "stt-server/requirements.txt is missing");
+    assert.equal(typeof layer.route, "function");
   });
 
   // --- Summary ---

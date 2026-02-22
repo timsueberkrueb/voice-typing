@@ -2,10 +2,9 @@ import * as vscode from "vscode";
 import { VoicePromptSettings } from "../config/settings";
 import {
   AudioChunk,
+  ICommandLayer,
   IInputInjector,
-  IRewriteProvider,
-  ISttProvider,
-  RewriteInput
+  ISttProvider
 } from "../types/contracts";
 import { AudioCaptureService, cleanupWavFile } from "../audio/audioCaptureService";
 
@@ -13,24 +12,14 @@ interface Dependencies {
   settings: VoicePromptSettings;
   audioCapture: AudioCaptureService;
   sttProvider: ISttProvider;
-  rewriteProvider: IRewriteProvider | undefined;
-  cloudRewriteProvider?: IRewriteProvider;
+  cloudCommandLayer?: ICommandLayer;
   inputInjector: IInputInjector;
 }
 
 export class VoicePromptOrchestrator {
-  private warnedNoBackend = false;
   private lastCapturedAudio?: AudioChunk;
 
   constructor(private readonly deps: Dependencies) {}
-
-  setRewriteProviders(
-    rewriteProvider: IRewriteProvider | undefined,
-    cloudRewriteProvider: IRewriteProvider | undefined
-  ): void {
-    this.deps.rewriteProvider = rewriteProvider;
-    this.deps.cloudRewriteProvider = cloudRewriteProvider;
-  }
 
   async runOnce(): Promise<void> {
     let statusDisposable: vscode.Disposable | undefined;
@@ -76,14 +65,31 @@ export class VoicePromptOrchestrator {
         return;
       }
 
-      setStatus("$(sync~spin) Rewriting...");
-
+      let finalText = sourceText;
+      let routeMs = 0;
       const t2 = Date.now();
-      const finalText = await this.resolveFinalText(sourceText);
-      const rewriteMs = Date.now() - t2;
-      if (!finalText) {
-        clearStatus();
-        return;
+      if (this.deps.settings.commandProvider === "chatgpt") {
+        if (!this.deps.cloudCommandLayer) {
+          clearStatus();
+          void vscode.window.showErrorMessage(
+            "Cloud command layer is unavailable."
+          );
+          return;
+        }
+
+        setStatus("$(sync~spin) Routing intent...");
+        const handled = await this.deps.cloudCommandLayer.route(sourceText);
+        routeMs = Date.now() - t2;
+
+        if (handled) {
+          clearStatus();
+          const totalMs = Date.now() - t0;
+          void vscode.window.setStatusBarMessage(
+            `$(check) Done (rec ${(recordMs / 1000).toFixed(1)}s + stt ${(sttMs / 1000).toFixed(1)}s + route ${(routeMs / 1000).toFixed(1)}s = ${(totalMs / 1000).toFixed(1)}s)`,
+            5000
+          );
+          return;
+        }
       }
 
       const maybeEdited = await this.previewIfEnabled(finalText);
@@ -97,68 +103,18 @@ export class VoicePromptOrchestrator {
         clearStatus();
         const totalMs = Date.now() - t0;
         void vscode.window.setStatusBarMessage(
-          `$(check) Done (rec ${(recordMs / 1000).toFixed(1)}s + stt ${(sttMs / 1000).toFixed(1)}s + rewrite ${(rewriteMs / 1000).toFixed(1)}s = ${(totalMs / 1000).toFixed(1)}s)`,
+          `$(check) Done (rec ${(recordMs / 1000).toFixed(1)}s + stt ${(sttMs / 1000).toFixed(1)}s + route ${(routeMs / 1000).toFixed(1)}s = ${(totalMs / 1000).toFixed(1)}s)`,
           5000
         );
       } catch {
         clearStatus();
         await vscode.env.clipboard.writeText(maybeEdited);
         void vscode.window.showErrorMessage(
-          "Insertion failed. Copied rewritten prompt to clipboard — paste with Cmd+V."
+          "Insertion failed. Copied transcript to clipboard — paste with Cmd+V."
         );
       }
     } finally {
       clearStatus();
-    }
-  }
-
-  private async resolveFinalText(sourceText: string): Promise<string | undefined> {
-    const { noRewriteBehavior } = this.deps.settings;
-
-    if (!this.deps.rewriteProvider || this.deps.settings.rewriteProvider === "none") {
-      if (!this.warnedNoBackend) {
-        this.warnedNoBackend = true;
-        void vscode.window.showWarningMessage(
-          "No rewrite backend configured. Raw transcript will be used. Configure Ollama or cloud rewrite in settings."
-        );
-      }
-
-      if (noRewriteBehavior === "disable_plugin") {
-        void vscode.window.showWarningMessage(
-          "Rewrite backend unavailable. Voice Prompt is disabled by policy."
-        );
-        return undefined;
-      }
-      return sourceText;
-    }
-
-    const rewriteInput: RewriteInput = {
-      transcript: sourceText,
-      style: this.deps.settings.rewriteStyle
-    };
-
-    try {
-      const rewritten = await this.deps.rewriteProvider.rewrite(rewriteInput);
-      return rewritten.text.trim() || sourceText;
-    } catch {
-      if (this.deps.settings.autoFallbackToCloud && this.deps.cloudRewriteProvider) {
-        try {
-          const cloudRewritten = await this.deps.cloudRewriteProvider.rewrite(
-            rewriteInput
-          );
-          return cloudRewritten.text.trim() || sourceText;
-        } catch {
-          // Fall through to policy.
-        }
-      }
-
-      if (noRewriteBehavior === "disable_plugin") {
-        void vscode.window.showErrorMessage(
-          "Rewrite failed and plugin is configured to disable when rewrite is unavailable."
-        );
-        return undefined;
-      }
-      return sourceText;
     }
   }
 
