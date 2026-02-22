@@ -10,7 +10,8 @@ export type ToolName =
   | "insert_terminal_command"
   | "execute_vscode_control"
   | "apply_editor_edit"
-  | "search_project_files";
+  | "search_project_files"
+  | "execute_codex_agent";
 
 export interface ToolCall {
   id: string;

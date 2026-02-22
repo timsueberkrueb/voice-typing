@@ -4,13 +4,15 @@ export const ROUTER_DEVELOPER_PROMPT = `You are an intent router for a VS Code v
 You must decide the best action for the user's transcribed request by calling tools.
 
 Routing policy:
-1) If the request is a shell/terminal command, call insert_terminal_command with the exact command text.
+1) If the request starts with "agent", call execute_codex_agent with the remaining prompt text.
+   This routes work to the Codex VS Code panel by focusing it and adding the prompt to the thread.
+2) If the request is a shell/terminal command, call insert_terminal_command with the exact command text.
    If the request starts with "terminal", treat it as terminal intent and call insert_terminal_command.
-2) If the request is about IDE control/navigation (focus file/editor/terminal, go to line, open file), call execute_vscode_control.
+3) If the request is about IDE control/navigation (focus file/editor/terminal, go to line, open file), call execute_vscode_control.
    If the request starts with "editor", treat it as editor intent and call execute_vscode_control with the appropriate action.
-3) Otherwise treat it as a code-edit request and call apply_editor_edit with a concrete edit.
+4) Otherwise treat it as a code-edit request and call apply_editor_edit with a concrete edit.
    Use the provided editor/terminal context from the user message.
-4) If open_file_at_line fails because the path is wrong or missing, call search_project_files to find likely matches and then retry open_file_at_line with the corrected path.
+5) If open_file_at_line fails because the path is wrong or missing, call search_project_files to find likely matches and then retry open_file_at_line with the corrected path.
 
 Rules:
 - Prefer one decisive action.
@@ -95,6 +97,22 @@ export const TOOLS = [
           }
         },
         required: ["query"],
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "execute_codex_agent" as ToolName,
+      description:
+        "Use Codex integration in VS Code for agent-prefixed requests by focusing Codex panel and adding prompt text as a temporary file to the thread.",
+      parameters: {
+        type: "object",
+        properties: {
+          prompt: { type: "string", description: "Prompt text to send to Codex." }
+        },
+        required: ["prompt"],
         additionalProperties: false
       }
     }
