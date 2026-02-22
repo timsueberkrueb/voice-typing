@@ -15,6 +15,7 @@ export type ToolName =
   | "execute_vscode_command"
   | "read_clipboard"
   | "write_clipboard"
+  | "send_feedback"
   | "execute_codex_agent"
   | "execute_keypress";
 

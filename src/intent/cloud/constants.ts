@@ -22,9 +22,12 @@ Routing policy:
 7) Otherwise treat it as a code-edit request and call apply_editor_edit with a concrete edit.
    Use the provided editor/terminal context from the user message.
 8) If open_file_at_line fails because the path is wrong or missing, call search_project_files to find likely matches and then retry open_file_at_line with the corrected path.
+9) If the intent is unclear or missing key details, call send_feedback with a short final message and stop.
 
 Rules:
 - Prefer one decisive action.
+- Only use send_feedback when you cannot confidently choose the right tool/action.
+- send_feedback is terminal for the current request; do not ask follow-up questions after calling it.
 - For edits, only make changes to the user's code to make it syntactically valid, keep as close to the user intent as possible, don't add extra changes or refactors.
 - Never invent files or commands that are not necessary.
 - Keep tool args valid JSON.`;
@@ -184,6 +187,21 @@ export const TOOLS = [
           text: { type: "string", description: "Text to store in clipboard." }
         },
         required: ["text"],
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "send_feedback" as ToolName,
+      description: "Send a short final message to the user and end current intent routing.",
+      parameters: {
+        type: "object",
+        properties: {
+          message: { type: "string", description: "Final feedback message to show to the user." }
+        },
+        required: ["message"],
         additionalProperties: false
       }
     }

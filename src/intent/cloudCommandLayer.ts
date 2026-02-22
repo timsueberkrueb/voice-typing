@@ -27,6 +27,7 @@ import { insertTerminalCommandTool } from "./cloud/tools/insertTerminalCommandTo
 import { readClipboardTool } from "./cloud/tools/readClipboardTool";
 import { searchVsCodeCommandsTool } from "./cloud/tools/searchVsCodeCommandsTool";
 import { searchProjectFilesTool } from "./cloud/tools/searchProjectFilesTool";
+import { sendFeedbackTool } from "./cloud/tools/sendFeedbackTool";
 import { writeClipboardTool } from "./cloud/tools/writeClipboardTool";
 import {
   CloudCommandLayerOptions,
@@ -161,6 +162,8 @@ export class CloudCommandLayer implements ICommandLayer {
           return readClipboardTool();
         case "write_clipboard":
           return writeClipboardTool(parsed);
+        case "send_feedback":
+          return sendFeedbackTool(parsed);
         case "execute_codex_agent":
           return executeCodexAgentTool(parsed);
         case "execute_keypress":
